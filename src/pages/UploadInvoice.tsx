@@ -44,7 +44,7 @@ const UploadInvoice = () => {
         sessionStorage.setItem("n8nResponse", JSON.stringify(data));
 
         toast.success("✅ File uploaded successfully!");
-        navigate("/upload-invoice/preview"); // Go to preview page directly
+        navigate("/UploadPreview"); // Go to preview page directly
       } else {
           toast.error("❌ Upload failed. Please try again.");
       }
