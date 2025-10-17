@@ -11,10 +11,11 @@ interface InvoiceFormData {
   invoiceNumber: string;
   invoiceDate: string;
   vendorName: string;
-  vendorAddress: string;
+  billingAddress: string;
   totalAmount: string;
-  taxAmount: string;
   description: string;
+  uploadDate: string;
+  note: string;
 }
 
 const UploadConfirm = () => {
@@ -24,10 +25,11 @@ const UploadConfirm = () => {
     invoiceNumber: "INV-2024-001",
     invoiceDate: "2024-10-17",
     vendorName: "Sample Vendor Co.",
-    vendorAddress: "123 Business St, City, State 12345",
+    billingAddress: "123 Business St, City, State 12345",
     totalAmount: "1250.00",
-    taxAmount: "125.00",
     description: "Professional services rendered",
+    uploadDate: new Date().toISOString().split('T')[0],
+    note: "",
   });
 
   useEffect(() => {
@@ -131,36 +133,23 @@ const UploadConfirm = () => {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="vendorAddress">Vendor Address</Label>
+                  <Label htmlFor="billingAddress">Billing Address</Label>
                   <Input
-                    id="vendorAddress"
-                    value={formData.vendorAddress}
-                    onChange={(e) => handleInputChange("vendorAddress", e.target.value)}
+                    id="billingAddress"
+                    value={formData.billingAddress}
+                    onChange={(e) => handleInputChange("billingAddress", e.target.value)}
                   />
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="totalAmount">Total Amount</Label>
-                    <Input
-                      id="totalAmount"
-                      type="number"
-                      step="0.01"
-                      value={formData.totalAmount}
-                      onChange={(e) => handleInputChange("totalAmount", e.target.value)}
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="taxAmount">Tax Amount</Label>
-                    <Input
-                      id="taxAmount"
-                      type="number"
-                      step="0.01"
-                      value={formData.taxAmount}
-                      onChange={(e) => handleInputChange("taxAmount", e.target.value)}
-                    />
-                  </div>
+                <div className="space-y-2">
+                  <Label htmlFor="totalAmount">Total Amount</Label>
+                  <Input
+                    id="totalAmount"
+                    type="number"
+                    step="0.01"
+                    value={formData.totalAmount}
+                    onChange={(e) => handleInputChange("totalAmount", e.target.value)}
+                  />
                 </div>
 
                 <div className="space-y-2">
@@ -169,6 +158,25 @@ const UploadConfirm = () => {
                     id="description"
                     value={formData.description}
                     onChange={(e) => handleInputChange("description", e.target.value)}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="uploadDate">Upload Date</Label>
+                  <Input
+                    id="uploadDate"
+                    type="date"
+                    value={formData.uploadDate}
+                    onChange={(e) => handleInputChange("uploadDate", e.target.value)}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="note">Note</Label>
+                  <Input
+                    id="note"
+                    value={formData.note}
+                    onChange={(e) => handleInputChange("note", e.target.value)}
                   />
                 </div>
 

@@ -119,25 +119,28 @@ const UploadPreview = () => {
                   </div>
 
                   <div className="p-3 bg-secondary rounded-lg">
-                    <p className="text-xs text-muted-foreground mb-1">Vendor Address</p>
-                    <p className="font-medium text-foreground">{formData.vendorAddress}</p>
+                    <p className="text-xs text-muted-foreground mb-1">Billing Address</p>
+                    <p className="font-medium text-foreground">{formData.billingAddress}</p>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="p-3 bg-secondary rounded-lg">
-                      <p className="text-xs text-muted-foreground mb-1">Total Amount</p>
-                      <p className="font-medium text-foreground">${formData.totalAmount}</p>
-                    </div>
-
-                    <div className="p-3 bg-secondary rounded-lg">
-                      <p className="text-xs text-muted-foreground mb-1">Tax Amount</p>
-                      <p className="font-medium text-foreground">${formData.taxAmount}</p>
-                    </div>
+                  <div className="p-3 bg-secondary rounded-lg">
+                    <p className="text-xs text-muted-foreground mb-1">Total Amount</p>
+                    <p className="font-medium text-foreground">${formData.totalAmount}</p>
                   </div>
 
                   <div className="p-3 bg-secondary rounded-lg">
                     <p className="text-xs text-muted-foreground mb-1">Description</p>
                     <p className="font-medium text-foreground">{formData.description}</p>
+                  </div>
+
+                  <div className="p-3 bg-secondary rounded-lg">
+                    <p className="text-xs text-muted-foreground mb-1">Upload Date</p>
+                    <p className="font-medium text-foreground">{formData.uploadDate}</p>
+                  </div>
+
+                  <div className="p-3 bg-secondary rounded-lg">
+                    <p className="text-xs text-muted-foreground mb-1">Note</p>
+                    <p className="font-medium text-foreground">{formData.note || "N/A"}</p>
                   </div>
                 </div>
 
