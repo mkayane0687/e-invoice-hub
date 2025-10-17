@@ -3,12 +3,14 @@ import { useNavigate } from "react-router-dom";
 import { FileText, CheckCircle2, Save, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 
 const UploadPreview = () => {
   const navigate = useNavigate();
-  const [fileData, setFileData] = useState<any>(null);
-  const [invoiceData, setInvoiceData] = useState<any>(null);
+  const [fileData, setFileData] = useState<File | null>(null);
+  const [invoiceData, setInvoiceData] = useState<Record<string, string>>({});
 
   useEffect(() => {
     const storedFile = sessionStorage.getItem("uploadedFile");
@@ -20,17 +22,25 @@ const UploadPreview = () => {
       return;
     }
 
-    setFileData(JSON.parse(storedFile));
-
     try {
+      const parsedFile = JSON.parse(storedFile);
       const parsedResponse = JSON.parse(storedResponse);
-      // Handle array response from n8n
+      setFileData(parsedFile);
       setInvoiceData(Array.isArray(parsedResponse) ? parsedResponse[0] : parsedResponse);
     } catch (err) {
-      console.error("Error parsing n8n response:", err);
-      toast.error("Invalid response format");
+      console.error("Error parsing stored data:", err);
+      toast.error("Invalid stored data");
+      navigate("/upload-invoice");
     }
   }, [navigate]);
+
+  // ✅ Allow inline editing
+  const handleInputChange = (key: string, value: string) => {
+    setInvoiceData((prev) => ({
+      ...prev,
+      [key]: value,
+    }));
+  };
 
   const handleFinalConfirm = async () => {
     if (!invoiceData) {
@@ -49,15 +59,14 @@ const UploadPreview = () => {
       );
 
       if (response.ok) {
-        toast.success("Invoice sent successfully!");
-        // Optional: save locally or redirect
+        toast.success("✅ Invoice sent successfully!");
         navigate("/search-invoice");
       } else {
-        toast.error("Failed to send invoice");
+        toast.error("❌ Failed to send invoice");
       }
     } catch (error) {
       console.error("Webhook error:", error);
-      toast.error("Network or server error");
+      toast.error("⚠️ Network or server error");
     }
   };
 
@@ -70,6 +79,10 @@ const UploadPreview = () => {
 
   if (!fileData || !invoiceData) return null;
 
+  const isImage = fileData.type?.startsWith("image/");
+  const isPDF = fileData.type === "application/pdf";
+  const fileURL = fileData.previewUrl || URL.createObjectURL(fileData);
+
   return (
     <div className="min-h-[calc(100vh-4rem)] bg-gradient-subtle">
       <div className="container mx-auto px-6 py-12">
@@ -77,7 +90,7 @@ const UploadPreview = () => {
           <div className="mb-8 flex items-center justify-between">
             <div>
               <h1 className="text-4xl font-bold text-foreground mb-2">Final Preview</h1>
-              <p className="text-muted-foreground">Review the final invoice before saving</p>
+              <p className="text-muted-foreground">Review and edit before sending</p>
             </div>
             <Button onClick={handleRetract} variant="outline" className="shadow-soft">
               <X className="mr-2 h-4 w-4" />
@@ -95,17 +108,33 @@ const UploadPreview = () => {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="bg-secondary rounded-lg p-8 text-center">
-                  <FileText className="h-24 w-24 text-primary mx-auto mb-4" />
-                  <p className="font-medium text-foreground">{fileData.name}</p>
-                  <p className="text-sm text-muted-foreground mt-2">
-                    {(fileData.size / 1024).toFixed(2)} KB
-                  </p>
+                <div className="bg-secondary rounded-lg p-4 text-center">
+                  {isImage ? (
+                    <img
+                      src={fileURL}
+                      alt="Uploaded"
+                      className="mx-auto max-h-[400px] rounded-lg"
+                    />
+                  ) : isPDF ? (
+                    <iframe
+                      src={fileURL}
+                      title="PDF Preview"
+                      className="w-full h-[400px] rounded-lg"
+                    ></iframe>
+                  ) : (
+                    <div className="p-10">
+                      <FileText className="h-20 w-20 text-primary mx-auto mb-4" />
+                      <p className="font-medium text-foreground">{fileData.name}</p>
+                      <p className="text-sm text-muted-foreground mt-1">
+                        {(fileData.size / 1024).toFixed(2)} KB
+                      </p>
+                    </div>
+                  )}
                 </div>
               </CardContent>
             </Card>
 
-            {/* Read-only Invoice Data */}
+            {/* Editable Invoice Data */}
             <Card className="shadow-medium">
               <CardHeader>
                 <CardTitle className="flex items-center space-x-2">
@@ -115,13 +144,24 @@ const UploadPreview = () => {
               </CardHeader>
               <CardContent className="space-y-4">
                 {Object.entries(invoiceData).map(([key, value]) => (
-                  <div key={key} className="p-3 bg-secondary rounded-lg">
+                  <div key={key} className="space-y-1">
                     <p className="text-xs text-muted-foreground mb-1">
                       {key.replace(/([A-Z])/g, " $1")}
                     </p>
-                    <p className="font-medium text-foreground">
-                      {value?.toString() || "N/A"}
-                    </p>
+                    {key.toLowerCase().includes("description") ||
+                    key.toLowerCase().includes("note") ? (
+                      <Textarea
+                        value={value}
+                        onChange={(e) => handleInputChange(key, e.target.value)}
+                        className="bg-secondary"
+                      />
+                    ) : (
+                      <Input
+                        value={value}
+                        onChange={(e) => handleInputChange(key, e.target.value)}
+                        className="bg-secondary"
+                      />
+                    )}
                   </div>
                 ))}
 
