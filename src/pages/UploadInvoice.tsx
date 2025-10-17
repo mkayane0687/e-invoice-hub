@@ -22,7 +22,6 @@ const UploadInvoice = () => {
       return;
     }
 
-    // Prepare file for sending to n8n
     const formData = new FormData();
     formData.append("file", file);
     formData.append("filename", file.name);
@@ -37,11 +36,36 @@ const UploadInvoice = () => {
         }
       );
 
-      if (response.ok) {
-        toast.success("✅ File uploaded successfully!");
-        navigate("/upload-invoice/confirm");
-      } else {
+      if (!response.ok) {
         toast.error("❌ Upload failed. Please try again.");
+        return;
+      }
+
+      // ✅ Parse JSON response from n8n
+      const data = await response.json();
+
+      // Example of expected response:
+      // [
+      //   {
+      //     "Invoice Number": "OR-77790",
+      //     "Invoice Date": "22/04/2023",
+      //     "Vendor Name": "SL SOFTWARE SOLUTIONS SON BHD",
+      //     "Billing Address": "Pasir 31650 IpohPerak",
+      //     "Total Amount": "2500.00",
+      //     "Description": "PAYMENT ON A/c",
+      //     "Note": "empty",
+      //     "Upload Date": "17/10/2025"
+      //   }
+      // ]
+
+      if (Array.isArray(data) && data.length > 0) {
+        // ✅ Save response to sessionStorage (for preview page)
+        sessionStorage.setItem("invoiceData", JSON.stringify(data));
+
+        toast.success("✅ File processed successfully!");
+        navigate("/upload-invoice/preview"); // 👈 Navigate to your preview component
+      } else {
+        toast.warning("⚠️ No data returned from the server.");
       }
     } catch (error) {
       console.error("Upload error:", error);
