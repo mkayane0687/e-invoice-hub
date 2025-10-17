@@ -13,28 +13,29 @@ const UploadPreview = () => {
   const [invoiceData, setInvoiceData] = useState<Record<string, string>>({});
 
   useEffect(() => {
-    const storedFile = sessionStorage.getItem("uploadedFile");
-    const storedResponse = sessionStorage.getItem("n8nResponse");
-
-    if (!storedFile || !storedResponse) {
-      toast.error("Missing invoice data");
-      navigate("/upload-invoice");
-      return;
-    }
-
     try {
+      const storedFile = sessionStorage.getItem("uploadedFile");
+      const storedResponse = sessionStorage.getItem("n8nResponse");
+
+      if (!storedFile || !storedResponse) {
+        toast.error("Missing invoice data");
+        navigate("/upload-invoice");
+        return;
+      }
+
       const parsedFile = JSON.parse(storedFile);
       const parsedResponse = JSON.parse(storedResponse);
+
       setFileData(parsedFile);
       setInvoiceData(Array.isArray(parsedResponse) ? parsedResponse[0] : parsedResponse);
-    } catch (err) {
-      console.error("Error parsing stored data:", err);
-      toast.error("Invalid stored data");
+    } catch (error) {
+      console.error("Error parsing session data:", error);
+      toast.error("Corrupted invoice data, please re-upload.");
       navigate("/upload-invoice");
     }
   }, [navigate]);
 
-  // ✅ Allow inline editing
+  // ✅ Inline field editing
   const handleInputChange = (key: string, value: string) => {
     setInvoiceData((prev) => ({
       ...prev,
@@ -42,8 +43,9 @@ const UploadPreview = () => {
     }));
   };
 
+  // ✅ Final confirmation: send edited invoice to webhook
   const handleFinalConfirm = async () => {
-    if (!invoiceData) {
+    if (!invoiceData || Object.keys(invoiceData).length === 0) {
       toast.error("No invoice data to send");
       return;
     }
@@ -70,6 +72,7 @@ const UploadPreview = () => {
     }
   };
 
+  // ✅ Cancel and go back to upload
   const handleRetract = () => {
     sessionStorage.removeItem("uploadedFile");
     sessionStorage.removeItem("n8nResponse");
@@ -77,11 +80,12 @@ const UploadPreview = () => {
     navigate("/upload-invoice");
   };
 
-  if (!fileData || !invoiceData) return null;
+  // ✅ Prevent rendering until data is ready
+  if (!fileData || Object.keys(invoiceData).length === 0) return null;
 
   const isImage = fileData.type?.startsWith("image/");
   const isPDF = fileData.type === "application/pdf";
-  const fileURL = fileData.previewUrl || URL.createObjectURL(fileData);
+  const fileURL = fileData.previewUrl || URL.createObjectURL(new Blob([fileData]));
 
   return (
     <div className="min-h-[calc(100vh-4rem)] bg-gradient-subtle">
@@ -99,7 +103,7 @@ const UploadPreview = () => {
           </div>
 
           <div className="grid lg:grid-cols-2 gap-8">
-            {/* File Preview */}
+            {/* 🧾 File Preview */}
             <Card className="shadow-medium">
               <CardHeader>
                 <CardTitle className="flex items-center space-x-2">
@@ -134,7 +138,7 @@ const UploadPreview = () => {
               </CardContent>
             </Card>
 
-            {/* Editable Invoice Data */}
+            {/* 🧾 Editable Invoice Fields */}
             <Card className="shadow-medium">
               <CardHeader>
                 <CardTitle className="flex items-center space-x-2">
