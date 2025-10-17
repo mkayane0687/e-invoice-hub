@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { FileText, CheckCircle2, Save } from "lucide-react";
+import { FileText, CheckCircle2, Save, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "sonner";
@@ -49,15 +49,28 @@ const UploadPreview = () => {
     navigate("/search-invoice");
   };
 
+  const handleRetract = () => {
+    sessionStorage.removeItem("uploadedFile");
+    sessionStorage.removeItem("invoiceFormData");
+    toast.info("Upload cancelled");
+    navigate("/upload-invoice");
+  };
+
   if (!fileData || !formData) return null;
 
   return (
     <div className="min-h-[calc(100vh-4rem)] bg-gradient-subtle">
       <div className="container mx-auto px-6 py-12">
         <div className="max-w-6xl mx-auto">
-          <div className="mb-8">
-            <h1 className="text-4xl font-bold text-foreground mb-2">Final Preview</h1>
-            <p className="text-muted-foreground">Review the final invoice before saving</p>
+          <div className="mb-8 flex items-center justify-between">
+            <div>
+              <h1 className="text-4xl font-bold text-foreground mb-2">Final Preview</h1>
+              <p className="text-muted-foreground">Review the final invoice before saving</p>
+            </div>
+            <Button onClick={handleRetract} variant="outline" className="shadow-soft">
+              <X className="mr-2 h-4 w-4" />
+              Cancel Upload
+            </Button>
           </div>
 
           <div className="grid lg:grid-cols-2 gap-8">
