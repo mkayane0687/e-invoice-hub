@@ -16,24 +16,37 @@ const UploadInvoice = () => {
     }
   };
 
-  const handleConfirm = () => {
+  const handleConfirm = async () => {
     if (!file) {
       toast.error("Please select a file to upload");
       return;
     }
 
-    // Store file in sessionStorage for demo purposes
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      sessionStorage.setItem("uploadedFile", JSON.stringify({
-        name: file.name,
-        type: file.type,
-        size: file.size,
-        data: e.target?.result,
-      }));
-      navigate("/upload-invoice/confirm");
-    };
-    reader.readAsDataURL(file);
+    // Prepare file for sending to n8n
+    const formData = new FormData();
+    formData.append("file", file);
+    formData.append("filename", file.name);
+    formData.append("uploadedAt", new Date().toISOString());
+
+    try {
+      const response = await fetch(
+        "https://n8n-production.bridgenet-lab.site/webhook-test/0b884a80-f36c-4adf-8ad1-c3a7c376c526",
+        {
+          method: "POST",
+          body: formData,
+        }
+      );
+
+      if (response.ok) {
+        toast.success("✅ File uploaded successfully!");
+        navigate("/upload-invoice/confirm");
+      } else {
+        toast.error("❌ Upload failed. Please try again.");
+      }
+    } catch (error) {
+      console.error("Upload error:", error);
+      toast.error("⚠️ Network or server error.");
+    }
   };
 
   return (
