@@ -11,9 +11,7 @@ const UploadInvoice = () => {
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = event.target.files?.[0];
-    if (selectedFile) {
-      setFile(selectedFile);
-    }
+    if (selectedFile) setFile(selectedFile);
   };
 
   const handleConfirm = async () => {
@@ -36,46 +34,28 @@ const UploadInvoice = () => {
         }
       );
 
-      if (response.ok) {
-        const data = await response.json();
-
-        // Save the file and n8n response to sessionStorage
-        sessionStorage.setItem("uploadedFile", JSON.stringify(file));
-        sessionStorage.setItem("n8nResponse", JSON.stringify(data));
-
-        toast.success("✅ File uploaded successfully!");
-        navigate("/UploadPreview.tsx"); // Go to preview page directly
-      } else {
-          toast.error("❌ Upload failed. Please try again.");
+      if (!response.ok) {
+        toast.error("❌ Upload failed. Please try again.");
+        return;
       }
 
-
-      // ✅ Parse JSON response from n8n
+      // ✅ Parse response once
       const data = await response.json();
 
-      // Example of expected response:
-      // [
-      //   {
-      //     "Invoice Number": "OR-77790",
-      //     "Invoice Date": "22/04/2023",
-      //     "Vendor Name": "SL SOFTWARE SOLUTIONS SON BHD",
-      //     "Billing Address": "Pasir 31650 IpohPerak",
-      //     "Total Amount": "2500.00",
-      //     "Description": "PAYMENT ON A/c",
-      //     "Note": "empty",
-      //     "Upload Date": "17/10/2025"
-      //   }
-      // ]
+      // ✅ Save file and n8n response to sessionStorage
+      sessionStorage.setItem("uploadedFile", JSON.stringify(file));
+      sessionStorage.setItem("n8nResponse", JSON.stringify(data));
 
+      // ✅ Check if n8n returned parsed invoice data
       if (Array.isArray(data) && data.length > 0) {
-        // ✅ Save response to sessionStorage (for preview page)
         sessionStorage.setItem("invoiceData", JSON.stringify(data));
-
         toast.success("✅ File processed successfully!");
-        navigate("/upload-invoice/preview"); // 👈 Navigate to your preview component
       } else {
-        toast.warning("⚠️ No data returned from the server.");
+        toast.warning("⚠️ No invoice data returned from the server.");
       }
+
+      // ✅ Navigate to preview page
+      navigate("/upload-invoice/preview");
     } catch (error) {
       console.error("Upload error:", error);
       toast.error("⚠️ Network or server error.");
@@ -98,6 +78,7 @@ const UploadInvoice = () => {
                 Choose a PDF, image, or document file to upload
               </CardDescription>
             </CardHeader>
+
             <CardContent className="space-y-6">
               <div className="border-2 border-dashed border-border rounded-lg p-12 text-center hover:border-primary/50 transition-colors">
                 <input
