@@ -36,10 +36,19 @@ const UploadInvoice = () => {
         }
       );
 
-      if (!response.ok) {
-        toast.error("❌ Upload failed. Please try again.");
-        return;
+      if (response.ok) {
+        const data = await response.json();
+
+        // Save the file and n8n response to sessionStorage
+        sessionStorage.setItem("uploadedFile", JSON.stringify(file));
+        sessionStorage.setItem("n8nResponse", JSON.stringify(data));
+
+        toast.success("✅ File uploaded successfully!");
+        navigate("/upload-invoice/preview"); // Go to preview page directly
+      } else {
+          toast.error("❌ Upload failed. Please try again.");
       }
+
 
       // ✅ Parse JSON response from n8n
       const data = await response.json();
