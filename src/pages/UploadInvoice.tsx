@@ -27,7 +27,7 @@ const UploadInvoice = () => {
 
     try {
       const response = await fetch(
-        "https://n8n-production.bridgenet-lab.site/webhook-test/0b884a80-f36c-4adf-8ad1-c3a7c376c526",
+        "https://n8n-production.bridgenet-lab.site/webhook/0b884a80-f36c-4adf-8ad1-c3a7c376c526",
         {
           method: "POST",
           body: formData,
