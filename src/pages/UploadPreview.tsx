@@ -13,27 +13,39 @@ const UploadPreview = () => {
   const [invoiceData, setInvoiceData] = useState<Record<string, string>>({});
 
   useEffect(() => {
-    try {
-      const storedFile = sessionStorage.getItem("uploadedFile");
-      const storedResponse = sessionStorage.getItem("n8nResponse");
+  try {
+    const storedFile = sessionStorage.getItem("uploadedFile");
+    const storedResponse = sessionStorage.getItem("n8nResponse");
 
-      if (!storedFile || !storedResponse) {
-        toast.error("Missing invoice data");
-        navigate("/upload-invoice");
-        return;
-      }
-
-      const parsedFile = JSON.parse(storedFile);
-      const parsedResponse = JSON.parse(storedResponse);
-
-      setFileData(parsedFile);
-      setInvoiceData(Array.isArray(parsedResponse) ? parsedResponse[0] : parsedResponse);
-    } catch (error) {
-      console.error("Error parsing session data:", error);
-      toast.error("Corrupted invoice data, please re-upload.");
+    if (!storedFile || !storedResponse) {
+      toast.error("Missing invoice data");
       navigate("/upload-invoice");
+      return;
     }
-  }, [navigate]);
+
+    const parsedFile = JSON.parse(storedFile);
+    const parsedResponse = JSON.parse(storedResponse);
+
+    // ✅ Convert Base64 back into a Blob
+    const byteString = atob(parsedFile.data.split(",")[1]);
+    const mimeString = parsedFile.type;
+    const ab = new ArrayBuffer(byteString.length);
+    const ia = new Uint8Array(ab);
+    for (let i = 0; i < byteString.length; i++) {
+      ia[i] = byteString.charCodeAt(i);
+    }
+    const blob = new Blob([ab], { type: mimeString });
+    const blobFile = new File([blob], parsedFile.name, { type: parsedFile.type });
+
+    setFileData(blobFile);
+    setInvoiceData(Array.isArray(parsedResponse) ? parsedResponse[0] : parsedResponse);
+  } catch (error) {
+    console.error("Error parsing session data:", error);
+    toast.error("Corrupted invoice data, please re-upload.");
+    navigate("/upload-invoice");
+  }
+}, [navigate]);
+
 
   // ✅ Inline field editing
   const handleInputChange = (key: string, value: string) => {
@@ -85,7 +97,7 @@ const UploadPreview = () => {
 
   const isImage = fileData.type?.startsWith("image/");
   const isPDF = fileData.type === "application/pdf";
-  const fileURL = fileData.previewUrl || URL.createObjectURL(new Blob([fileData]));
+  const fileURL = URL.createObjectURL(fileData);
 
   return (
     <div className="min-h-[calc(100vh-4rem)] bg-gradient-subtle">
