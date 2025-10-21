@@ -52,33 +52,15 @@ const UploadPreview = () => {
     }));
   };
 
-  // ✅ Final confirmation: send edited invoice to webhook
-  const handleFinalConfirm = async () => {
+  // ✅ Instead of sending webhook, just navigate to UploadConfirm.tsx
+  const handleFinalConfirm = () => {
     if (!invoiceData || Object.keys(invoiceData).length === 0) {
-      toast.error("No invoice data to send");
+      toast.error("No invoice data to confirm");
       return;
     }
 
-    try {
-      const response = await fetch(
-        "https://n8n-production.bridgenet-lab.site/webhook-test/bd125577-c752-4b03-b76d-907bb4aac86b",
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(invoiceData),
-        }
-      );
-
-      if (response.ok) {
-        toast.success("✅ Invoice sent successfully!");
-        navigate("/search-invoice");
-      } else {
-        toast.error("❌ Failed to send invoice");
-      }
-    } catch (error) {
-      console.error("Webhook error:", error);
-      toast.error("⚠️ Network or server error");
-    }
+    sessionStorage.setItem("editedInvoiceData", JSON.stringify(invoiceData));
+    navigate("/upload-invoice/confirm");
   };
 
   // ✅ Cancel and go back to upload
@@ -103,7 +85,7 @@ const UploadPreview = () => {
           <div className="mb-8 flex items-center justify-between">
             <div>
               <h1 className="text-4xl font-bold text-foreground mb-2">Final Preview</h1>
-              <p className="text-muted-foreground">Review and edit before sending</p>
+              <p className="text-muted-foreground">Review and edit before confirming</p>
             </div>
             <Button onClick={handleRetract} variant="outline" className="shadow-soft">
               <X className="mr-2 h-4 w-4" />
@@ -184,7 +166,7 @@ const UploadPreview = () => {
                   size="lg"
                 >
                   <Save className="mr-2 h-4 w-4" />
-                  Send to Webhook
+                  Confirm & Continue
                 </Button>
               </CardContent>
             </Card>
