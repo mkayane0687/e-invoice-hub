@@ -43,7 +43,23 @@ const UploadInvoice = () => {
       const data = await response.json();
 
       // ✅ Save file and n8n response to sessionStorage
-      sessionStorage.setItem("uploadedFile", JSON.stringify(file));
+      // Convert file to Base64 string for storage
+      const toBase64 = (file: File) =>
+        new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result as string);
+          reader.onerror = reject;
+          reader.readAsDataURL(file);
+        });
+
+const base64Data = await toBase64(file);
+sessionStorage.setItem("uploadedFile", JSON.stringify({
+  name: file.name,
+  type: file.type,
+  size: file.size,
+  data: base64Data,
+}));
+
       sessionStorage.setItem("n8nResponse", JSON.stringify(data));
 
       // ✅ Check if n8n returned parsed invoice data
