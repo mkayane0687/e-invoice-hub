@@ -19,12 +19,12 @@ const UploadInvoice = () => {
       toast.error("Please select a file to upload");
       return;
     }
-
+  
     const formData = new FormData();
     formData.append("file", file);
     formData.append("filename", file.name);
     formData.append("uploadedAt", new Date().toISOString());
-
+  
     try {
       const response = await fetch(
         "https://n8n-production.bridgenet-lab.site/webhook/0b884a80-f36c-4adf-8ad1-c3a7c376c526",
@@ -33,38 +33,44 @@ const UploadInvoice = () => {
           body: formData,
         }
       );
-
+  
+      // ✅ Parse response once
+      const data = await response.json();
+  
+      // ✅ Check for code 199 (file type error)
+      if (data.code === 199) {
+        toast.error("❌ Invalid file type. Please upload a PDF only.");
+        return; // stop further processing
+      }
+  
       if (!response.ok) {
         toast.error("❌ Upload failed. Please try again.");
         return;
       }
-
-      // ✅ Parse response once
-      const data = await response.json();
-
+  
       // ✅ Save file and n8n response to sessionStorage
       // Convert file to base64 for preview persistence
       const toBase64 = (file: File) =>
-      new Promise<string>((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(reader.result as string);
-        reader.onerror = reject;
-        reader.readAsDataURL(file);
-      });
-
+        new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result as string);
+          reader.onerror = reject;
+          reader.readAsDataURL(file);
+        });
+  
       const base64File = await toBase64(file);
       sessionStorage.setItem(
-      "uploadedFile",
-      JSON.stringify({
-        name: file.name,
-        type: file.type,
-        size: file.size,
-        dataUrl: base64File, // ✅ store as base64
-      })
+        "uploadedFile",
+        JSON.stringify({
+          name: file.name,
+          type: file.type,
+          size: file.size,
+          dataUrl: base64File, // ✅ store as base64
+        })
       );
-
+  
       sessionStorage.setItem("n8nResponse", JSON.stringify(data));
-
+  
       // ✅ Check if n8n returned parsed invoice data
       if (Array.isArray(data) && data.length > 0) {
         sessionStorage.setItem("invoiceData", JSON.stringify(data));
@@ -72,7 +78,7 @@ const UploadInvoice = () => {
       } else {
         toast.warning("⚠️ No invoice data returned from the server.");
       }
-
+  
       // ✅ Navigate to preview page
       navigate("/upload-invoice/preview");
     } catch (error) {
@@ -80,6 +86,7 @@ const UploadInvoice = () => {
       toast.error("⚠️ Network or server error.");
     }
   };
+  
 
   return (
     <div className="min-h-[calc(100vh-4rem)] bg-gradient-subtle">
@@ -94,7 +101,7 @@ const UploadInvoice = () => {
             <CardHeader>
               <CardTitle>Select Invoice File</CardTitle>
               <CardDescription>
-                Choose a PDF, image, or document file to upload
+                Choose a PDF file to upload
               </CardDescription>
             </CardHeader>
 
@@ -105,7 +112,7 @@ const UploadInvoice = () => {
                   id="file-upload"
                   className="hidden"
                   onChange={handleFileChange}
-                  accept=".pdf,.png,.jpg,.jpeg,.doc,.docx"
+                  accept=".pdf"
                 />
                 <label
                   htmlFor="file-upload"
@@ -119,7 +126,7 @@ const UploadInvoice = () => {
                       Click to upload or drag and drop
                     </p>
                     <p className="text-sm text-muted-foreground">
-                      PDF, PNG, JPG, DOC (max. 10MB)
+                      PDF only (max. 10MB)
                     </p>
                   </div>
                 </label>
