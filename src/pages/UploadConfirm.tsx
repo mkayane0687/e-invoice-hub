@@ -1,64 +1,100 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { FileText, CheckCircle2, X } from "lucide-react";
+import { FileText, CheckCircle2, X, ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 
 interface InvoiceFormData {
-  invoiceNumber: string;
-  invoiceDate: string;
-  vendorName: string;
-  billingAddress: string;
-  totalAmount: string;
-  description: string;
-  uploadDate: string;
-  note: string;
+  [key: string]: string;
 }
 
 const UploadConfirm = () => {
   const navigate = useNavigate();
   const [fileData, setFileData] = useState<any>(null);
-  const [formData, setFormData] = useState<InvoiceFormData>({
-    invoiceNumber: "INV-2024-001",
-    invoiceDate: "2024-10-17",
-    vendorName: "Sample Vendor Co.",
-    billingAddress: "123 Business St, City, State 12345",
-    totalAmount: "1250.00",
-    description: "Professional services rendered",
-    uploadDate: new Date().toISOString().split('T')[0],
-    note: "",
-  });
+  const [formData, setFormData] = useState<InvoiceFormData>({});
 
+  // ✅ Load uploaded file and edited invoice data
   useEffect(() => {
-    const stored = sessionStorage.getItem("uploadedFile");
-    if (!stored) {
-      toast.error("No file uploaded");
+    try {
+      const storedFile = sessionStorage.getItem("uploadedFile");
+      const editedInvoice = sessionStorage.getItem("editedInvoiceData");
+
+      if (!storedFile || !editedInvoice) {
+        toast.error("Missing confirmation data");
+        navigate("/upload-invoice");
+        return;
+      }
+
+      setFileData(JSON.parse(storedFile));
+      setFormData(JSON.parse(editedInvoice));
+    } catch (error) {
+      console.error("Error loading confirmation data:", error);
+      toast.error("Corrupted session data");
       navigate("/upload-invoice");
-      return;
     }
-    setFileData(JSON.parse(stored));
   }, [navigate]);
 
-  const handleInputChange = (field: keyof InvoiceFormData, value: string) => {
-    setFormData((prev) => ({ ...prev, [field]: value }));
+  // ✅ Confirm upload and navigate home
+// ✅ Confirm upload and send to n8n webhook
+  const handleConfirmUpload = async () => {
+    try {
+      // Combine both file and form data
+      const payload = {
+        file: {
+          name: fileData.name,
+          type: fileData.type,
+          size: fileData.size,
+        },
+        invoice: formData,
+      };
+
+      // Send POST to webhook
+      const response = await fetch("https://n8n-production.bridgenet-lab.site/webhook/bd125577-c752-4b03-b76d-907bb4aac86b", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Webhook failed with status ${response.status}`);
+      }
+
+      toast.success("✅ Invoice successfully uploaded!");
+      
+      // Clean up session data
+      sessionStorage.removeItem("uploadedFile");
+      sessionStorage.removeItem("n8nResponse");
+      sessionStorage.removeItem("editedInvoiceData");
+
+      navigate("/");
+    } catch (error) {
+      console.error("Error sending data to webhook:", error);
+      toast.error("Failed to upload invoice to server");
+    }
   };
 
-  const handleConfirm = () => {
-    sessionStorage.setItem("invoiceFormData", JSON.stringify(formData));
+
+  // ✅ Go back to edit screen
+  const handleBackToEdit = () => {
     navigate("/upload-invoice/preview");
   };
 
+  // ✅ Cancel entire process
   const handleRetract = () => {
-    sessionStorage.removeItem("uploadedFile");
-    sessionStorage.removeItem("invoiceFormData");
+    sessionStorage.clear();
     toast.info("Upload cancelled");
     navigate("/upload-invoice");
   };
 
-  if (!fileData) return null;
+  if (!fileData || Object.keys(formData).length === 0) return null;
+
+  const isImage = fileData.type?.startsWith("image/");
+  const isPDF = fileData.type === "application/pdf";
+  const fileURL = fileData.dataUrl;
 
   return (
     <div className="min-h-[calc(100vh-4rem)] bg-gradient-subtle">
@@ -66,8 +102,8 @@ const UploadConfirm = () => {
         <div className="max-w-6xl mx-auto">
           <div className="mb-8 flex items-center justify-between">
             <div>
-              <h1 className="text-4xl font-bold text-foreground mb-2">Confirm Invoice Details</h1>
-              <p className="text-muted-foreground">Review and edit the extracted invoice information</p>
+              <h1 className="text-4xl font-bold text-foreground mb-2">Confirm Final Upload</h1>
+              <p className="text-muted-foreground">Please review the invoice details before final confirmation.</p>
             </div>
             <Button onClick={handleRetract} variant="outline" className="shadow-soft">
               <X className="mr-2 h-4 w-4" />
@@ -81,108 +117,73 @@ const UploadConfirm = () => {
               <CardHeader>
                 <CardTitle className="flex items-center space-x-2">
                   <FileText className="h-5 w-5 text-primary" />
-                  <span>Uploaded File Preview</span>
+                  <span>Uploaded File</span>
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="bg-secondary rounded-lg p-8 text-center">
-                  <FileText className="h-24 w-24 text-primary mx-auto mb-4" />
-                  <p className="font-medium text-foreground">{fileData.name}</p>
-                  <p className="text-sm text-muted-foreground mt-2">
-                    {(fileData.size / 1024).toFixed(2)} KB
-                  </p>
+                <div className="bg-secondary rounded-lg p-4 text-center">
+                  {isImage ? (
+                    <img
+                      src={fileURL}
+                      alt="Uploaded"
+                      className="mx-auto max-h-[400px] rounded-lg"
+                    />
+                  ) : isPDF ? (
+                    <iframe
+                      src={fileURL}
+                      title="PDF Preview"
+                      className="w-full h-[400px] rounded-lg"
+                    ></iframe>
+                  ) : (
+                    <div className="p-10">
+                      <FileText className="h-20 w-20 text-primary mx-auto mb-4" />
+                      <p className="font-medium text-foreground">{fileData.name}</p>
+                      <p className="text-sm text-muted-foreground mt-1">
+                        {(fileData.size / 1024).toFixed(2)} KB
+                      </p>
+                    </div>
+                  )}
                 </div>
               </CardContent>
             </Card>
 
-            {/* Editable Form */}
+            {/* Confirm Invoice Details */}
             <Card className="shadow-medium">
               <CardHeader>
                 <CardTitle className="flex items-center space-x-2">
                   <CheckCircle2 className="h-5 w-5 text-success" />
-                  <span>Invoice Information (Editable)</span>
+                  <span>Final Invoice Details</span>
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="invoiceNumber">Invoice Number</Label>
-                  <Input
-                    id="invoiceNumber"
-                    value={formData.invoiceNumber}
-                    onChange={(e) => handleInputChange("invoiceNumber", e.target.value)}
-                  />
-                </div>
+                {Object.entries(formData).map(([key, value]) => (
+                  <div key={key} className="space-y-1">
+                    <Label className="text-xs text-muted-foreground">
+                      {key.replace(/([A-Z])/g, " $1")}
+                    </Label>
+                    <p className="p-2 bg-secondary rounded-md text-foreground">{value}</p>
+                  </div>
+                ))}
 
-                <div className="space-y-2">
-                  <Label htmlFor="invoiceDate">Invoice Date</Label>
-                  <Input
-                    id="invoiceDate"
-                    type="date"
-                    value={formData.invoiceDate}
-                    onChange={(e) => handleInputChange("invoiceDate", e.target.value)}
-                  />
-                </div>
+                <div className="flex gap-4 mt-6">
+                  <Button
+                    onClick={handleBackToEdit}
+                    variant="outline"
+                    className="w-1/2 shadow-medium"
+                    size="lg"
+                  >
+                    <ArrowLeft className="mr-2 h-4 w-4" />
+                    Back to Edit
+                  </Button>
 
-                <div className="space-y-2">
-                  <Label htmlFor="vendorName">Vendor Name</Label>
-                  <Input
-                    id="vendorName"
-                    value={formData.vendorName}
-                    onChange={(e) => handleInputChange("vendorName", e.target.value)}
-                  />
+                  <Button
+                    onClick={handleConfirmUpload}
+                    className="w-1/2 shadow-medium"
+                    size="lg"
+                  >
+                    Confirm Upload
+                  </Button>
                 </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="billingAddress">Billing Address</Label>
-                  <Input
-                    id="billingAddress"
-                    value={formData.billingAddress}
-                    onChange={(e) => handleInputChange("billingAddress", e.target.value)}
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="totalAmount">Total Amount</Label>
-                  <Input
-                    id="totalAmount"
-                    type="number"
-                    step="0.01"
-                    value={formData.totalAmount}
-                    onChange={(e) => handleInputChange("totalAmount", e.target.value)}
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="description">Description</Label>
-                  <Input
-                    id="description"
-                    value={formData.description}
-                    onChange={(e) => handleInputChange("description", e.target.value)}
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="uploadDate">Upload Date</Label>
-                  <Input
-                    id="uploadDate"
-                    type="date"
-                    value={formData.uploadDate}
-                    onChange={(e) => handleInputChange("uploadDate", e.target.value)}
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="note">Note</Label>
-                  <Input
-                    id="note"
-                    value={formData.note}
-                    onChange={(e) => handleInputChange("note", e.target.value)}
-                  />
-                </div>
-
-                <Button onClick={handleConfirm} className="w-full shadow-medium mt-6" size="lg">
-                  Confirm Details
-                </Button>
               </CardContent>
             </Card>
           </div>
