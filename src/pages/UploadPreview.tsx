@@ -138,7 +138,9 @@ const UploadPreview = () => {
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                {Object.entries(invoiceData).map(([key, value]) => (
+              {Object.entries(invoiceData)
+                .filter(([key]) => key !== "Session id" && key !== "Link to view") // ✅ hide these two
+                .map(([key, value]) => (
                   <div key={key} className="space-y-1">
                     <p className="text-xs text-muted-foreground mb-1">
                       {key.replace(/([A-Z])/g, " $1")}
@@ -159,7 +161,6 @@ const UploadPreview = () => {
                     )}
                   </div>
                 ))}
-
                 <Button
                   onClick={handleFinalConfirm}
                   className="w-full shadow-medium mt-6"
