@@ -64,12 +64,36 @@ const UploadPreview = () => {
   };
 
   // ✅ Cancel and go back to upload
-  const handleRetract = () => {
-    sessionStorage.removeItem("uploadedFile");
-    sessionStorage.removeItem("n8nResponse");
-    toast.info("Upload cancelled");
-    navigate("/upload-invoice");
-  };
+
+  const handleRetract = async () => {
+    try {
+      const storedResponse = sessionStorage.getItem("n8nResponse");
+  
+      if (storedResponse) {
+        const parsed = JSON.parse(storedResponse);
+        const linkToView = Array.isArray(parsed)
+          ? parsed[0]?.["Link to view"]
+          : parsed?.["Link to view"];
+  
+        if (linkToView) {
+          await fetch("https://n8n-production.bridgenet-lab.site/webhook/5dec72e9-208d-4ab8-accb-f27a80bfd6e6", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ linkToView }),
+          });
+        }
+      }
+  
+      toast.info("Upload cancelled and pending file removed.");
+    } catch (error) {
+      console.error("Cleanup error:", error);
+      toast.warning("Upload cancelled, but cleanup may have failed.");
+    } finally {
+      sessionStorage.removeItem("uploadedFile");
+      sessionStorage.removeItem("n8nResponse");
+      navigate("/upload-invoice");
+    }
+  };  
 
   // ✅ Prevent rendering until data is ready
   if (!fileData || Object.keys(invoiceData).length === 0) return null;
