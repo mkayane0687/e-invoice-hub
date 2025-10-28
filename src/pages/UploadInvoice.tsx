@@ -5,9 +5,9 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "sonner";
 
-//push test
 const UploadInvoice = () => {
   const [file, setFile] = useState<File | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
   const navigate = useNavigate();
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -21,6 +21,7 @@ const UploadInvoice = () => {
       return;
     }
   
+    setIsUploading(true);
     const formData = new FormData();
     formData.append("file", file);
     formData.append("filename", file.name);
@@ -35,22 +36,22 @@ const UploadInvoice = () => {
         }
       );
   
-      // ✅ Parse response once
       const data = await response.json();
   
       // ✅ Check for code 199 (file type error)
       if (data.code === 199) {
         toast.error("❌ Invalid file type. Please upload a PDF only.");
-        return; // stop further processing
+        setIsUploading(false);
+        return;
       }
   
       if (!response.ok) {
         toast.error("❌ Upload failed. Please try again.");
+        setIsUploading(false);
         return;
       }
   
-      // ✅ Save file and n8n response to sessionStorage
-      // Convert file to base64 for preview persistence
+      // ✅ Convert file to base64 for preview persistence
       const toBase64 = (file: File) =>
         new Promise<string>((resolve, reject) => {
           const reader = new FileReader();
@@ -60,17 +61,34 @@ const UploadInvoice = () => {
         });
   
       const base64File = await toBase64(file);
-      sessionStorage.setItem(
-        "uploadedFile",
-        JSON.stringify({
-          name: file.name,
-          type: file.type,
-          size: file.size,
-          dataUrl: base64File, // ✅ store as base64
-        })
-      );
+      
+      // ✅ CRITICAL FIX: Store data in variables first, then write to storage
+      const fileData = JSON.stringify({
+        name: file.name,
+        type: file.type,
+        size: file.size,
+        dataUrl: base64File,
+      });
+      
+      const responseData = JSON.stringify(data);
+      
+      // ✅ Write to sessionStorage
+      sessionStorage.setItem("uploadedFile", fileData);
+      sessionStorage.setItem("n8nResponse", responseData);
   
-      sessionStorage.setItem("n8nResponse", JSON.stringify(data));
+      // ✅ Verify storage was written (critical for debugging)
+      const verifyFile = sessionStorage.getItem("uploadedFile");
+      const verifyResponse = sessionStorage.getItem("n8nResponse");
+      
+      if (!verifyFile || !verifyResponse) {
+        console.error("❌ Storage verification failed!", {
+          hasFile: !!verifyFile,
+          hasResponse: !!verifyResponse
+        });
+        toast.error("Storage error. Please try again.");
+        setIsUploading(false);
+        return;
+      }
   
       // ✅ Check if n8n returned parsed invoice data
       if (Array.isArray(data) && data.length > 0) {
@@ -80,14 +98,23 @@ const UploadInvoice = () => {
         toast.warning("⚠️ No invoice data returned from the server.");
       }
   
+      // ✅ Small delay to ensure storage persistence before navigation
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
+      // ✅ Final verification before navigation
+      console.log("✅ Navigating with storage:", {
+        uploadedFile: !!sessionStorage.getItem("uploadedFile"),
+        n8nResponse: !!sessionStorage.getItem("n8nResponse")
+      });
+      
       // ✅ Navigate to preview page
       navigate("/upload-invoice/preview");
     } catch (error) {
       console.error("Upload error:", error);
       toast.error("⚠️ Network or server error.");
+      setIsUploading(false);
     }
   };
-  
 
   return (
     <div className="min-h-[calc(100vh-4rem)] bg-gradient-subtle">
@@ -114,10 +141,13 @@ const UploadInvoice = () => {
                   className="hidden"
                   onChange={handleFileChange}
                   accept=".pdf"
+                  disabled={isUploading}
                 />
                 <label
                   htmlFor="file-upload"
-                  className="cursor-pointer flex flex-col items-center space-y-4"
+                  className={`cursor-pointer flex flex-col items-center space-y-4 ${
+                    isUploading ? "opacity-50 pointer-events-none" : ""
+                  }`}
                 >
                   <div className="h-16 w-16 rounded-full bg-secondary flex items-center justify-center">
                     <Upload className="h-8 w-8 text-primary" />
@@ -149,9 +179,9 @@ const UploadInvoice = () => {
                 onClick={handleConfirm}
                 className="w-full shadow-medium"
                 size="lg"
-                disabled={!file}
+                disabled={!file || isUploading}
               >
-                Confirm Upload
+                {isUploading ? "Processing..." : "Confirm Upload"}
               </Button>
             </CardContent>
           </Card>
