@@ -1,163 +1,254 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { Upload, FileText } from "lucide-react";
+import { FileText, CheckCircle2, X, ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 
-const UploadInvoice = () => {
-  const [file, setFile] = useState<File | null>(null);
+interface InvoiceFormData {
+  [key: string]: string;
+}
+
+const UploadConfirm = () => {
   const navigate = useNavigate();
+  const [fileData, setFileData] = useState<any>(null);
+  const [formData, setFormData] = useState<InvoiceFormData>({});
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const selectedFile = event.target.files?.[0];
-    if (selectedFile) setFile(selectedFile);
-  };
-
-  const handleConfirm = async () => {
-    if (!file) {
-      toast.error("Please select a file to upload");
-      return;
-    }
-  
-    const formData = new FormData();
-    formData.append("file", file);
-    formData.append("filename", file.name);
-    formData.append("uploadedAt", new Date().toISOString());
-  
+  // ✅ Load uploaded file and edited invoice data
+  useEffect(() => {
     try {
-      const response = await fetch(
-        "https://n8n-production.bridgenet-lab.site/webhook/0b884a80-f36c-4adf-8ad1-c3a7c376c526",
-        {
-          method: "POST",
-          body: formData,
-        }
-      );
-  
-      // ✅ Parse response once
-      const data = await response.json();
-  
-      // ✅ Check for code 199 (file type error)
-      if (data.code === 199) {
-        toast.error("❌ Invalid file type. Please upload a PDF only.");
-        return; // stop further processing
-      }
-  
-      if (!response.ok) {
-        toast.error("❌ Upload failed. Please try again.");
+      const storedFile = sessionStorage.getItem("uploadedFile");
+      const editedInvoice = sessionStorage.getItem("editedInvoiceData");
+
+      if (!storedFile || !editedInvoice) {
+        toast.error("Missing confirmation data");
+        navigate("/upload-invoice");
         return;
       }
-  
-      // ✅ Save file and n8n response to sessionStorage
-      // Convert file to base64 for preview persistence
-      const toBase64 = (file: File) =>
-        new Promise<string>((resolve, reject) => {
-          const reader = new FileReader();
-          reader.onload = () => resolve(reader.result as string);
-          reader.onerror = reject;
-          reader.readAsDataURL(file);
-        });
-  
-      const base64File = await toBase64(file);
-      sessionStorage.setItem(
-        "uploadedFile",
-        JSON.stringify({
-          name: file.name,
-          type: file.type,
-          size: file.size,
-          dataUrl: base64File, // ✅ store as base64
-        })
+
+      setFileData(JSON.parse(storedFile));
+      setFormData(JSON.parse(editedInvoice));
+    } catch (error) {
+      console.error("Error loading confirmation data:", error);
+      toast.error("Corrupted session data");
+      navigate("/upload-invoice");
+    }
+  }, [navigate]);
+
+  // ✅ Confirm upload, wait for response, then navigate home
+  const handleConfirmUpload = async () => {
+    setIsSubmitting(true);
+
+    try {
+      // Retrieve hidden metadata from previous n8n response
+      const n8nResponse = sessionStorage.getItem("n8nResponse");
+      let extraData = {};
+
+      if (n8nResponse) {
+        try {
+          const parsed = JSON.parse(n8nResponse);
+          if (Array.isArray(parsed) && parsed[0]) {
+            extraData = {
+              "Session id": parsed[0]["Session id"],
+              "Link to view": parsed[0]["Link to view"],
+            };
+          }
+        } catch (e) {
+          console.warn("Failed to parse n8nResponse:", e);
+        }
+      }
+
+      // ✅ Combine user-edited data + hidden metadata
+      const payload = [
+        {
+          ...formData,
+          ...extraData,
+        },
+      ];
+
+      const response = await fetch(
+        "https://n8n-production.bridgenet-lab.site/webhook/bd125577-c752-4b03-b76d-907bb4aac86b",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(payload),
+        }
       );
-  
-      sessionStorage.setItem("n8nResponse", JSON.stringify(data));
-  
-      // ✅ Check if n8n returned parsed invoice data
-      if (Array.isArray(data) && data.length > 0) {
-        sessionStorage.setItem("invoiceData", JSON.stringify(data));
-        toast.success("✅ File processed successfully!");
+
+      const data = await response.json().catch(() => null);
+
+      if (!response.ok) {
+        throw new Error(`Webhook failed: ${response.status}`);
+      }
+
+      if (data?.status === "ok" || data?.message?.includes("received")) {
+        toast.success("✅ Invoice successfully uploaded!");
+        sessionStorage.removeItem("uploadedFile");
+        sessionStorage.removeItem("n8nResponse");
+        sessionStorage.removeItem("editedInvoiceData");
+        navigate("/");
       } else {
-        toast.warning("⚠️ No invoice data returned from the server.");
+        throw new Error("Unexpected webhook response");
+      }
+    } catch (error) {
+      console.error("Error sending data to webhook:", error);
+      toast.error("⚠️ Failed to upload invoice. Please try again.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleBackToEdit = () => navigate("/upload-invoice/preview");
+
+  const handleRetract = async () => {
+    try {
+      const storedResponse = sessionStorage.getItem("n8nResponse");
+  
+      if (storedResponse) {
+        const parsed = JSON.parse(storedResponse);
+        const linkToView = Array.isArray(parsed)
+          ? parsed[0]?.["Link to view"]
+          : parsed?.["Link to view"];
+  
+        if (linkToView) {
+          await fetch("https://n8n-production.bridgenet-lab.site/webhook/5dec72e9-208d-4ab8-accb-f27a80bfd6e6", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ linkToView }),
+          });
+        }
       }
   
-      // ✅ Navigate to preview page
-      navigate("/upload-invoice/preview");
+      toast.info("Upload cancelled and pending file removed.");
     } catch (error) {
-      console.error("Upload error:", error);
-      toast.error("⚠️ Network or server error.");
+      console.error("Cleanup error:", error);
+      toast.warning("Upload cancelled, but cleanup may have failed.");
+    } finally {
+      sessionStorage.removeItem("uploadedFile");
+      sessionStorage.removeItem("n8nResponse");
+      navigate("/upload-invoice");
     }
   };
   
+
+  if (!fileData || Object.keys(formData).length === 0) return null;
+
+  const isImage = fileData.type?.startsWith("image/");
+  const isPDF = fileData.type === "application/pdf";
+  const fileURL = fileData.dataUrl;
 
   return (
     <div className="min-h-[calc(100vh-4rem)] bg-gradient-subtle">
       <div className="container mx-auto px-6 py-12">
-        <div className="max-w-2xl mx-auto">
-          <div className="mb-8">
-            <h1 className="text-4xl font-bold text-foreground mb-2">Upload Invoice</h1>
-            <p className="text-muted-foreground">Upload your invoice file for processing</p>
+        <div className="max-w-6xl mx-auto">
+          <div className="mb-8 flex items-center justify-between">
+            <div>
+              <h1 className="text-4xl font-bold text-foreground mb-2">
+                Confirm Final Upload
+              </h1>
+              <p className="text-muted-foreground">
+                Please review the invoice details before final confirmation.
+              </p>
+            </div>
+            <Button
+              onClick={handleRetract}
+              variant="outline"
+              className="shadow-soft"
+              disabled={isSubmitting}
+            >
+              <X className="mr-2 h-4 w-4" />
+              Cancel Upload
+            </Button>
           </div>
 
-          <Card className="shadow-medium">
-            <CardHeader>
-              <CardTitle>Select Invoice File</CardTitle>
-              <CardDescription>
-                Choose a PDF file to upload
-              </CardDescription>
-            </CardHeader>
-
-            <CardContent className="space-y-6">
-              <div className="border-2 border-dashed border-border rounded-lg p-12 text-center hover:border-primary/50 transition-colors">
-                <input
-                  type="file"
-                  id="file-upload"
-                  className="hidden"
-                  onChange={handleFileChange}
-                  accept=".pdf"
-                />
-                <label
-                  htmlFor="file-upload"
-                  className="cursor-pointer flex flex-col items-center space-y-4"
-                >
-                  <div className="h-16 w-16 rounded-full bg-secondary flex items-center justify-center">
-                    <Upload className="h-8 w-8 text-primary" />
-                  </div>
-                  <div>
-                    <p className="text-lg font-medium text-foreground mb-1">
-                      Click to upload or drag and drop
-                    </p>
-                    <p className="text-sm text-muted-foreground">
-                      PDF only (max. 10MB)
-                    </p>
-                  </div>
-                </label>
-              </div>
-
-              {file && (
-                <div className="flex items-center space-x-3 p-4 bg-secondary rounded-lg">
-                  <FileText className="h-8 w-8 text-primary" />
-                  <div className="flex-1">
-                    <p className="font-medium text-foreground">{file.name}</p>
-                    <p className="text-sm text-muted-foreground">
-                      {(file.size / 1024).toFixed(2)} KB
-                    </p>
-                  </div>
+          <div className="grid lg:grid-cols-2 gap-8">
+            {/* File Preview */}
+            <Card className="shadow-medium">
+              <CardHeader>
+                <CardTitle className="flex items-center space-x-2">
+                  <FileText className="h-5 w-5 text-primary" />
+                  <span>Uploaded File</span>
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="bg-secondary rounded-lg p-4 text-center">
+                  {isImage ? (
+                    <img
+                      src={fileURL}
+                      alt="Uploaded"
+                      className="mx-auto max-h-[400px] rounded-lg"
+                    />
+                  ) : isPDF ? (
+                    <iframe
+                      src={fileURL}
+                      title="PDF Preview"
+                      className="w-full h-[400px] rounded-lg"
+                    ></iframe>
+                  ) : (
+                    <div className="p-10">
+                      <FileText className="h-20 w-20 text-primary mx-auto mb-4" />
+                      <p className="font-medium text-foreground">{fileData.name}</p>
+                      <p className="text-sm text-muted-foreground mt-1">
+                        {(fileData.size / 1024).toFixed(2)} KB
+                      </p>
+                    </div>
+                  )}
                 </div>
-              )}
+              </CardContent>
+            </Card>
 
-              <Button
-                onClick={handleConfirm}
-                className="w-full shadow-medium"
-                size="lg"
-                disabled={!file}
-              >
-                Confirm Upload
-              </Button>
-            </CardContent>
-          </Card>
+            {/* Confirm Invoice Details */}
+            <Card className="shadow-medium">
+              <CardHeader>
+                <CardTitle className="flex items-center space-x-2">
+                  <CheckCircle2 className="h-5 w-5 text-success" />
+                  <span>Final Invoice Details</span>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {Object.entries(formData)
+                  .filter(([key]) => !["session id", "link to view"].includes(key.toLowerCase())) // ✅ hide
+                  .map(([key, value]) => (
+                    <div key={key} className="space-y-1">
+                      <Label className="text-xs text-muted-foreground">
+                        {key.replace(/([A-Z])/g, " $1")}
+                      </Label>
+                      <p className="p-2 bg-secondary rounded-md text-foreground">{value}</p>
+                    </div>
+                  ))}
+
+                <div className="flex gap-4 mt-6">
+                  <Button
+                    onClick={handleBackToEdit}
+                    variant="outline"
+                    className="w-1/2 shadow-medium"
+                    size="lg"
+                    disabled={isSubmitting}
+                  >
+                    <ArrowLeft className="mr-2 h-4 w-4" />
+                    Back to Edit
+                  </Button>
+
+                  <Button
+                    onClick={handleConfirmUpload}
+                    className="w-1/2 shadow-medium"
+                    size="lg"
+                    disabled={isSubmitting}
+                  >
+                    {isSubmitting ? "Uploading..." : "Confirm Upload"}
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
         </div>
       </div>
     </div>
   );
 };
 
-export default UploadInvoice;
+export default UploadConfirm;
